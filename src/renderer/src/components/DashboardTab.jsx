@@ -1,17 +1,15 @@
-import React from 'react'
+import PropTypes from 'prop-types'
 
-export default function DashboardTab({
-  batchStats,
-  timePassed,
-  clips,
-  isProcessing,
-  outputDir
-}) {
+export default function DashboardTab({ batchStats, timePassed, clips, isProcessing, outputDir }) {
   return (
     <div>
-      <h2 style={{ fontSize: '24px', fontWeight: 600, color: '#fff', marginBottom: '8px' }}>Batch Processing</h2>
-      <p style={{ color: 'var(--on-surface-variant)', fontSize: '14px', marginBottom: '32px' }}>Monitor and manage your active rendering jobs.</p>
-      
+      <h2 style={{ fontSize: '24px', fontWeight: 600, color: '#fff', marginBottom: '8px' }}>
+        Batch Processing
+      </h2>
+      <p style={{ color: 'var(--on-surface-variant)', fontSize: '14px', marginBottom: '32px' }}>
+        Monitor and manage your active rendering jobs.
+      </p>
+
       <div className="dashboard-cards">
         <div className="dashboard-card">
           <div className="card-label">TOTAL SHORTS</div>
@@ -27,9 +25,21 @@ export default function DashboardTab({
         </div>
       </div>
 
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginBottom: '16px'
+        }}
+      >
         <h3 style={{ fontSize: '16px', fontWeight: 600, color: '#fff' }}>Recent Exports</h3>
-        <span className="material-symbols-outlined" style={{ color: 'var(--on-surface-variant)', cursor: 'pointer' }}>filter_list</span>
+        <span
+          className="material-symbols-outlined"
+          style={{ color: 'var(--on-surface-variant)', cursor: 'pointer' }}
+        >
+          filter_list
+        </span>
       </div>
 
       <div className="clip-table">
@@ -39,13 +49,21 @@ export default function DashboardTab({
           <div>PROGRESS</div>
           <div style={{ textAlign: 'right' }}>ACTIONS</div>
         </div>
-        
-        {clips.map(clip => (
+        {clips.map((clip) => (
           <div key={clip.id} className="clip-row">
-            <div className="filename-cell" title={clip.filename}>{clip.filename}</div>
+            <div className="filename-cell" title={clip.filename}>
+              {clip.filename}
+            </div>
             <div className={`status-cell status-${clip.status}`}>
-              <span className={`material-symbols-outlined ${clip.status === 'Processing' ? 'spin' : ''}`} style={{ fontSize: 18 }}>
-                {clip.status === 'Processing' ? 'sync' : (clip.status === 'Done' ? 'check_circle' : 'schedule')}
+              <span
+                className={`material-symbols-outlined ${clip.status === 'Processing' ? 'spin' : ''}`}
+                style={{ fontSize: 18 }}
+              >
+                {clip.status === 'Processing'
+                  ? 'sync'
+                  : clip.status === 'Done'
+                    ? 'check_circle'
+                    : 'schedule'}
               </span>
               {clip.status}
             </div>
@@ -53,14 +71,21 @@ export default function DashboardTab({
               <div className="mini-progress-bar-container">
                 <div className="mini-progress-bar" style={{ width: `${clip.progress}%` }}></div>
               </div>
-              <div style={{ width: 40, textAlign: 'right', fontFamily: 'var(--font-mono)', fontSize: 12 }}>
+              <div
+                style={{
+                  width: 40,
+                  textAlign: 'right',
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: 12
+                }}
+              >
                 {clip.progress}%
               </div>
             </div>
             <div className="actions-cell">
-              <span 
+              <span
                 className={`material-symbols-outlined action-icon ${clip.status !== 'Done' ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
-                title={clip.status === 'Done' ? "Open folder" : "Wait for processing"}
+                title={clip.status === 'Done' ? 'Open folder' : 'Wait for processing'}
                 onClick={() => {
                   if (clip.status === 'Done') {
                     window.api?.showItemInFolder(outputDir + '\\' + clip.filename)
@@ -81,4 +106,16 @@ export default function DashboardTab({
       </div>
     </div>
   )
+}
+
+DashboardTab.propTypes = {
+  batchStats: PropTypes.shape({
+    total: PropTypes.number,
+    completed: PropTypes.number,
+    startTime: PropTypes.number
+  }),
+  timePassed: PropTypes.string,
+  clips: PropTypes.array,
+  isProcessing: PropTypes.bool,
+  outputDir: PropTypes.string
 }
