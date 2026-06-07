@@ -4,12 +4,20 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Progress } from "@/components/ui/progress"
+import { TimeInput } from "@/components/ui/time-picker"
+
+import EditorTab from './components/EditorTab'
+import SettingsTab from './components/SettingsTab'
+import DashboardTab from './components/DashboardTab'
+
 function App() {
   const [activeTab, setActiveTab] = useState('import')
   
   // State for Import
   const [inputVideo, setInputVideo] = useState(null)
   const [csvPath, setCsvPath] = useState(null)
+  const [inputMode, setInputMode] = useState('csv')
+  const [manualClips, setManualClips] = useState([{ id: Date.now(), final_title: '', startTime: '00:00:00', endTime: '00:00:00', show_heading: true }])
   const [outroVideo, setOutroVideo] = useState(null)
   const [outputDir, setOutputDir] = useState(null)
 
@@ -21,6 +29,9 @@ function App() {
   const [silenceDuration, setSilenceDuration] = useState(0.6)
   const [aspectRatio, setAspectRatio] = useState('1:1')
   const [headingFont, setHeadingFont] = useState('Inter')
+  const [exportQuality, setExportQuality] = useState('1080p')
+  const [codecFormat, setCodecFormat] = useState('Software x264')
+  const [autoProcess, setAutoProcess] = useState(false)
 
   const handlePresetChange = (preset) => {
     setSilencePreset(preset)
@@ -41,9 +52,22 @@ function App() {
   const [validationError, setValidationError] = useState('')
   const [clips, setClips] = useState([])
   const [batchStats, setBatchStats] = useState({ total: 0, completed: 0, startTime: null })
-  const [estimatedTime, setEstimatedTime] = useState('00m 00s')
+  const [timePassed, setTimePassed] = useState('00m 00s')
   const [logs, setLogs] = useState([])
   const logsEndRef = useRef(null)
+
+  useEffect(() => {
+    let interval;
+    if (isProcessing && batchStats.startTime) {
+      interval = setInterval(() => {
+        const elapsed = Date.now() - batchStats.startTime;
+        const mins = Math.floor(elapsed / 60000);
+        const secs = Math.floor((elapsed % 60000) / 1000);
+        setTimePassed(`${String(mins).padStart(2, '0')}m ${String(secs).padStart(2, '0')}s`);
+      }, 1000);
+    }
+    return () => clearInterval(interval);
+  }, [isProcessing, batchStats.startTime])
 
   useEffect(() => {
     if (logsEndRef.current) {
@@ -56,7 +80,7 @@ function App() {
       if (data.type === 'init_batch') {
         setClips(data.clips)
         setBatchStats({ total: data.totalClips, completed: 0, startTime: Date.now() })
-        setEstimatedTime('Calculating...')
+        setTimePassed('00m 00s')
         setLogs([])
         setIsProcessing(true)
       } else if (data.type === 'clip_progress') {
@@ -70,25 +94,7 @@ function App() {
         })
         
         if (data.status === 'Done') {
-          setBatchStats(prev => {
-            const newCompleted = prev.completed + 1
-            const elapsed = Date.now() - prev.startTime
-            const timePerClip = elapsed / newCompleted
-            const remaining = prev.total - newCompleted
-            const msLeft = timePerClip * remaining
-            
-            let timeStr = ''
-            if (newCompleted === prev.total) {
-              timeStr = '00m 00s'
-            } else {
-              const mins = Math.floor(msLeft / 60000)
-              const secs = Math.floor((msLeft % 60000) / 1000)
-              timeStr = `${String(mins).padStart(2, '0')}m ${String(secs).padStart(2, '0')}s`
-            }
-            
-            setEstimatedTime(timeStr)
-            return { ...prev, completed: newCompleted }
-          })
+          setBatchStats(prev => ({ ...prev, completed: prev.completed + 1 }))
         }
       } else if (data.type === 'info') {
         setLogs(prev => [...prev, data.message])
@@ -97,7 +103,6 @@ function App() {
         setIsProcessing(false)
       } else if (data.type === 'done') {
         setIsProcessing(false)
-        setEstimatedTime('00m 00s')
       }
     }
 
@@ -111,6 +116,18 @@ function App() {
       }
     }
   }, [])
+
+  const addManualClip = () => {
+    setManualClips(prev => [...prev, { id: Date.now(), final_title: '', startTime: '00:00:00', endTime: '00:00:00', show_heading: true }])
+  }
+
+  const removeManualClip = (id) => {
+    setManualClips(prev => prev.filter(c => c.id !== id))
+  }
+
+  const updateManualClip = (id, field, value) => {
+    setManualClips(prev => prev.map(c => c.id === id ? { ...c, [field]: value } : c))
+  }
 
   const handleSelectFile = async (type) => {
     if (!window.api) return
@@ -152,329 +169,155 @@ function App() {
   }
 
   const handleStart = () => {
-    if (!inputVideo || !csvPath || !outputDir) {
-      setValidationError("Please select your Source Video, Trimming CSV, and Output Directory.")
+    if (!inputVideo || !outputDir) {
+      setValidationError("Please select your Source Video and Output Directory.")
       return
     }
+    
+    if (inputMode === 'csv' && !csvPath) {
+      setValidationError("Please select your Trimming CSV.")
+      return
+    }
+
+    if (inputMode === 'manual') {
+      if (manualClips.length === 0) {
+        setValidationError("Please add at least one clip.")
+        return
+      }
+      const invalid = manualClips.some(c => !c.final_title.trim() || !c.startTime || !c.endTime)
+      if (invalid) {
+        setValidationError("Please fill out all titles and times for manual clips.")
+        return
+      }
+
+      const timeToSeconds = (t) => {
+        const p = (t || '00:00:00').split(':').map(Number);
+        return (p[0] || 0) * 3600 + (p[1] || 0) * 60 + (p[2] || 0);
+      };
+
+      const invalidTime = manualClips.some(c => timeToSeconds(c.endTime) <= timeToSeconds(c.startTime))
+      if (invalidTime) {
+        setValidationError("End time must be greater than start time for all clips.")
+        return
+      }
+    }
+
     setValidationError('')
     setIsProcessing(true)
     setClips([])
     setBatchStats({ total: 0, completed: 0, startTime: null })
-    setEstimatedTime('Calculating...')
+    setTimePassed('00m 00s')
     setLogs([])
     setActiveTab('progress')
 
     if (window.api) {
-      window.api.startProcessing({
-        inputVideo,
-        csvPath,
-        outputDir,
-        outroVideo,
-        shouldRemoveSilence,
-        disableHeading,
-        silenceThreshold,
-        silenceDuration: Number(silenceDuration),
-        aspectRatio,
-        headingFont
-      })
+        let encoder = 'libx264';
+        if (codecFormat === 'NVIDIA NVENC') encoder = 'h264_nvenc';
+        if (codecFormat === 'Apple VideoToolbox') encoder = 'h264_videotoolbox';
+
+        window.api.startProcessing({
+          inputVideo,
+          csvPath: inputMode === 'csv' ? csvPath : null,
+          manualClips: inputMode === 'manual' ? manualClips : null,
+          outputDir,
+          outroVideo,
+          shouldRemoveSilence,
+          disableHeading,
+          silenceThreshold,
+          silenceDuration: Number(silenceDuration),
+          aspectRatio,
+          headingFont,
+          encoder
+        })
     }
   }
 
   return (
     <div className="app-container">
       <nav className="sidebar">
-        <h1>ShortGen</h1>
-        <div 
-          className={`nav-item ${activeTab === 'import' ? 'active' : ''}`}
-          onClick={() => setActiveTab('import')}
-        >
-          <span className="material-symbols-outlined" style={{ marginRight: 12 }}>video_library</span>
-          Editor - Import
+        <div>
+          <h1>ShortGen</h1>
+          <div className="sidebar-version">V 2.4.0</div>
+          
+          <div 
+            className={`nav-item ${activeTab === 'import' ? 'active' : ''}`}
+            onClick={() => setActiveTab('import')}
+          >
+            <span className="material-symbols-outlined" style={{ marginRight: 12 }}>play_circle</span>
+            Editor
+          </div>
+          <div 
+            className={`nav-item`}
+            style={{ opacity: 0.5, cursor: 'not-allowed' }}
+          >
+            <span className="material-symbols-outlined" style={{ marginRight: 12 }}>content_cut</span>
+            Trim Preview
+          </div>
+          <div 
+            className={`nav-item ${activeTab === 'progress' ? 'active' : ''}`}
+            onClick={() => setActiveTab('progress')}
+          >
+            <span className="material-symbols-outlined" style={{ marginRight: 12 }}>grid_view</span>
+            Dashboard
+          </div>
+          <div 
+            className={`nav-item ${activeTab === 'settings' ? 'active' : ''}`}
+            onClick={() => setActiveTab('settings')}
+          >
+            <span className="material-symbols-outlined" style={{ marginRight: 12 }}>settings</span>
+            Settings
+          </div>
         </div>
-        <div 
-          className={`nav-item ${activeTab === 'settings' ? 'active' : ''}`}
-          onClick={() => setActiveTab('settings')}
-        >
-          <span className="material-symbols-outlined" style={{ marginRight: 12 }}>settings</span>
-          App Settings
-        </div>
-        <div 
-          className={`nav-item ${activeTab === 'progress' ? 'active' : ''}`}
-          onClick={() => setActiveTab('progress')}
-        >
-          <span className="material-symbols-outlined" style={{ marginRight: 12 }}>analytics</span>
-          Processing Status
-        </div>
+        
       </nav>
 
       <main className="main-content">
         <header className="header">
-          <div>Workspace &gt; New Project</div>
-          <div>
-            <Button onClick={handleStart} disabled={isProcessing}>
-              {isProcessing ? 'Processing...' : 'Generate Clips'}
+          <div className="header-left">WORKSPACE &gt; NEW PROJECT</div>
+          <div className="header-right">
+            <Button variant="outline" style={{ backgroundColor: 'transparent', borderColor: 'var(--outline)', color: '#fff' }}>Export</Button>
+            <Button onClick={handleStart} disabled={isProcessing} style={{ backgroundColor: '#a78bfa', color: '#121212', fontWeight: 600 }}>
+              {isProcessing ? 'Processing...' : 'Process All'}
             </Button>
           </div>
         </header>
 
         <div className="workspace">
           {activeTab === 'import' && (
-            <div className="card">
-              <h2>Asset Import</h2>
-              <p style={{ color: 'var(--on-surface-variant)', marginBottom: 24 }}>Configure sources for clip generation.</p>
-              
-              {validationError && (
-                <div style={{ padding: 16, backgroundColor: 'rgba(255, 180, 171, 0.1)', color: 'var(--error)', borderRadius: 'var(--radius)', border: '1px solid var(--error)', marginBottom: 24, display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span className="material-symbols-outlined">warning</span>
-                  {validationError}
-                </div>
-              )}
-
-              <div className="form-group">
-                <label>Source Video <span style={{ color: 'var(--error)' }}>*</span></label>
-                <div 
-                  className="dropzone" 
-                  onClick={() => handleSelectFile('video')}
-                  onDragOver={handleDragOver}
-                  onDrop={(e) => handleDrop(e, 'video')}
-                >
-                  <div className="icon"><span className="material-symbols-outlined" style={{ fontSize: 32 }}>movie</span></div>
-                  {inputVideo ? (
-                    <div className="file-selected">
-                      {inputVideo}
-                      <span className="material-symbols-outlined clear-btn" onClick={(e) => { e.stopPropagation(); setInputVideo(null) }}>close</span>
-                    </div>
-                  ) : <div>Click to browse or drag and drop source video</div>}
-                </div>
-              </div>
-
-              <div className="form-group">
-                <label>Trimming CSV <span style={{ color: 'var(--error)' }}>*</span></label>
-                <div 
-                  className="dropzone" 
-                  onClick={() => handleSelectFile('csv')}
-                  onDragOver={handleDragOver}
-                  onDrop={(e) => handleDrop(e, 'csv')}
-                >
-                  <div className="icon"><span className="material-symbols-outlined" style={{ fontSize: 32 }}>description</span></div>
-                  {csvPath ? (
-                    <div className="file-selected">
-                      {csvPath}
-                      <span className="material-symbols-outlined clear-btn" onClick={(e) => { e.stopPropagation(); setCsvPath(null) }}>close</span>
-                    </div>
-                  ) : <div>Click to browse or drag and drop CSV file</div>}
-                </div>
-              </div>
-
-              <div className="form-group">
-                <label>Outro Video (Optional)</label>
-                <div 
-                  className="dropzone" 
-                  onClick={() => handleSelectFile('outro')}
-                  onDragOver={handleDragOver}
-                  onDrop={(e) => handleDrop(e, 'outro')}
-                >
-                  <div className="icon"><span className="material-symbols-outlined" style={{ fontSize: 32 }}>add_box</span></div>
-                  {outroVideo ? (
-                    <div className="file-selected">
-                      {outroVideo}
-                      <span className="material-symbols-outlined clear-btn" onClick={(e) => { e.stopPropagation(); setOutroVideo(null) }}>close</span>
-                    </div>
-                  ) : <div>Click to browse or drag and drop outro video</div>}
-                </div>
-              </div>
-
-              <div className="form-group">
-                <label>Output Directory <span style={{ color: 'var(--error)' }}>*</span></label>
-                <div 
-                  className="dropzone" 
-                  onClick={handleSelectDir}
-                  onDragOver={handleDragOver}
-                  onDrop={(e) => handleDrop(e, 'dir')}
-                >
-                  <div className="icon"><span className="material-symbols-outlined" style={{ fontSize: 32 }}>folder_open</span></div>
-                  {outputDir ? (
-                    <div className="file-selected">
-                      {outputDir}
-                      <span className="material-symbols-outlined clear-btn" onClick={(e) => { e.stopPropagation(); setOutputDir(null) }}>close</span>
-                    </div>
-                  ) : <div>Click to select or drag and drop output directory</div>}
-                </div>
-              </div>
-            </div>
+            <EditorTab 
+              validationError={validationError}
+              inputVideo={inputVideo} setInputVideo={setInputVideo} handleSelectFile={handleSelectFile} handleDragOver={handleDragOver} handleDrop={handleDrop}
+              inputMode={inputMode} setInputMode={setInputMode}
+              csvPath={csvPath} setCsvPath={setCsvPath}
+              manualClips={manualClips} updateManualClip={updateManualClip} removeManualClip={removeManualClip} addManualClip={addManualClip}
+              outroVideo={outroVideo} setOutroVideo={setOutroVideo}
+              outputDir={outputDir} setOutputDir={setOutputDir} handleSelectDir={handleSelectDir}
+              isProcessing={isProcessing} handleStart={handleStart}
+            />
           )}
 
           {activeTab === 'settings' && (
-            <div className="card">
-              <h2>Processing Settings</h2>
-              
-              <div className="form-group flex items-center space-x-2" style={{ marginBottom: 16 }}>
-                <Checkbox 
-                  id="shouldRemoveSilence"
-                  checked={shouldRemoveSilence} 
-                  onCheckedChange={setShouldRemoveSilence} 
-                />
-                <Label htmlFor="shouldRemoveSilence" style={{ margin: 0, cursor: 'pointer' }}>Remove Dead Silence</Label>
-              </div>
-
-              <div className="form-group flex items-center space-x-2">
-                <Checkbox 
-                  id="disableHeading"
-                  checked={disableHeading} 
-                  onCheckedChange={setDisableHeading} 
-                />
-                <Label htmlFor="disableHeading" style={{ margin: 0, cursor: 'pointer' }}>Disable Heading Text Rendering</Label>
-              </div>
-
-              <div className="form-group" style={{ marginTop: 24 }}>
-                <Label style={{ marginBottom: 8, display: 'block' }}>Output Aspect Ratio</Label>
-                <Select value={aspectRatio} onValueChange={setAspectRatio}>
-                  <SelectTrigger className="w-full bg-[#121212] border-[#27272a] focus:ring-[#8B5CF6]">
-                    <SelectValue placeholder="Select Aspect Ratio" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="1:1">Square (1:1)</SelectItem>
-                    <SelectItem value="9:16">Vertical (9:16)</SelectItem>
-                    <SelectItem value="16:9">Landscape (16:9)</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {!disableHeading && (
-                <div className="form-group" style={{ marginTop: 24 }}>
-                  <Label style={{ marginBottom: 8, display: 'block' }}>Heading Font Style</Label>
-                  <Select value={headingFont} onValueChange={setHeadingFont}>
-                    <SelectTrigger className="w-full bg-[#121212] border-[#27272a] focus:ring-[#8B5CF6]">
-                      <SelectValue placeholder="Select Font" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Inter">Inter (Modern & Clean)</SelectItem>
-                      <SelectItem value="Poppins">Poppins (Geometric & Bold)</SelectItem>
-                      <SelectItem value="Playfair Display">Playfair Display (Classic Serif)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
-
-              {shouldRemoveSilence && (
-                <div style={{ padding: '16px', background: 'var(--primary-container)', borderRadius: '8px', border: '1px solid var(--outline)' }}>
-                  <div className="form-group" style={{ marginBottom: silencePreset === 'custom' ? 16 : 0 }}>
-                    <Label style={{ marginBottom: 8, display: 'block' }}>Silence Removal Profile</Label>
-                    <Select value={silencePreset} onValueChange={handlePresetChange}>
-                      <SelectTrigger className="w-full bg-[#121212] border-[#27272a] focus:ring-[#8B5CF6]">
-                        <SelectValue placeholder="Select Profile" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="standard">Standard (Recommended) - -35dB / 0.6s</SelectItem>
-                        <SelectItem value="conservative">Conservative - -40dB / 0.8s (Only long pauses)</SelectItem>
-                        <SelectItem value="aggressive">Aggressive - -30dB / 0.4s (Tight cuts)</SelectItem>
-                        <SelectItem value="custom">Custom (Advanced)</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <p style={{ fontSize: 12, color: 'var(--on-surface-variant)', marginTop: 8, lineHeight: 1.4 }}>
-                      {silencePreset === 'standard' && 'Ideal for most podcasts. Removes standard pauses without making speech sound unnatural.'}
-                      {silencePreset === 'conservative' && 'Safest option. Only removes very obvious, long gaps. Preserves natural breathing.'}
-                      {silencePreset === 'aggressive' && 'Snappy pacing. Removes almost all dead air between words. Can sound choppy.'}
-                      {silencePreset === 'custom' && 'Manually tune FFmpeg silence detection filters.'}
-                    </p>
-                  </div>
-
-                  {silencePreset === 'custom' && (
-                    <div style={{ display: 'flex', gap: 16 }}>
-                      <div className="form-group" style={{ flex: 1, marginBottom: 0 }}>
-                        <label>Threshold (e.g. -35dB)</label>
-                        <input 
-                          type="text" 
-                          className="input-text" 
-                          value={silenceThreshold} 
-                          onChange={e => setSilenceThreshold(e.target.value)} 
-                        />
-                      </div>
-                      
-                      <div className="form-group" style={{ flex: 1, marginBottom: 0 }}>
-                        <label>Duration (seconds)</label>
-                        <input 
-                          type="number" 
-                          step="0.1"
-                          className="input-text" 
-                          value={silenceDuration} 
-                          onChange={e => setSilenceDuration(e.target.value)} 
-                        />
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
+            <SettingsTab 
+              exportQuality={exportQuality} setExportQuality={setExportQuality}
+              aspectRatio={aspectRatio} setAspectRatio={setAspectRatio}
+              codecFormat={codecFormat} setCodecFormat={setCodecFormat}
+              outputDir={outputDir} handleSelectDir={handleSelectDir}
+              autoProcess={autoProcess} setAutoProcess={setAutoProcess}
+              shouldRemoveSilence={shouldRemoveSilence} setShouldRemoveSilence={setShouldRemoveSilence}
+              silencePreset={silencePreset} handlePresetChange={handlePresetChange}
+              silenceThreshold={silenceThreshold} setSilenceThreshold={setSilenceThreshold}
+              silenceDuration={silenceDuration} setSilenceDuration={setSilenceDuration}
+            />
           )}
 
           {activeTab === 'progress' && (
-            <div>
-              <h2 style={{ fontSize: 20, marginBottom: 24, color: '#fff' }}>Batch Processing</h2>
-              
-              <div className="dashboard-cards">
-                <div className="dashboard-card">
-                  <div className="card-label">TOTAL SHORTS</div>
-                  <div className="card-value">{batchStats.total.toLocaleString()}</div>
-                </div>
-                <div className="dashboard-card">
-                  <div className="card-label">COMPLETED</div>
-                  <div className="card-value">{batchStats.completed.toLocaleString()}</div>
-                </div>
-                <div className="dashboard-card">
-                  <div className="card-label">ESTIMATED TIME</div>
-                  <div className="card-value">{estimatedTime}</div>
-                </div>
-              </div>
-
-              <div className="clip-table">
-                <div className="clip-header">
-                  <div>OUTPUT FILENAME</div>
-                  <div>STATUS</div>
-                  <div>PROGRESS</div>
-                  <div style={{ textAlign: 'right' }}>ACTIONS</div>
-                </div>
-                
-                {clips.map(clip => (
-                  <div key={clip.id} className="clip-row">
-                    <div className="filename-cell" title={clip.filename}>{clip.filename}</div>
-                    <div className={`status-cell status-${clip.status}`}>
-                      <span className={`material-symbols-outlined ${clip.status === 'Processing' ? 'spin' : ''}`} style={{ fontSize: 18 }}>
-                        {clip.status === 'Processing' ? 'sync' : (clip.status === 'Done' ? 'check_circle' : 'schedule')}
-                      </span>
-                      {clip.status}
-                    </div>
-                    <div className={`progress-cell status-${clip.status} flex items-center`}>
-                      <div className="flex-1 mr-4">
-                        <Progress value={clip.progress} className="h-2 bg-[#27272a] [&>div]:bg-[#8B5CF6]" />
-                      </div>
-                      <div style={{ width: 40, textAlign: 'right', fontFamily: 'var(--font-mono)', fontSize: 12 }}>
-                        {clip.progress}%
-                      </div>
-                    </div>
-                    <div className="actions-cell">
-                      <span 
-                        className={`material-symbols-outlined action-icon ${clip.status !== 'Done' ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
-                        title={clip.status === 'Done' ? "Open folder" : "Wait for processing"}
-                        onClick={() => {
-                          if (clip.status === 'Done') {
-                            window.api?.showItemInFolder(outputDir + '\\' + clip.filename)
-                          }
-                        }}
-                      >
-                        folder_open
-                      </span>
-                    </div>
-                  </div>
-                ))}
-
-                {clips.length === 0 && !isProcessing && (
-                  <div style={{ padding: 40, textAlign: 'center', color: 'var(--on-surface-variant)' }}>
-                    No batch currently processing.
-                  </div>
-                )}
-              </div>
-            </div>
+            <DashboardTab 
+              batchStats={batchStats}
+              timePassed={timePassed}
+              clips={clips}
+              isProcessing={isProcessing}
+              outputDir={outputDir}
+            />
           )}
         </div>
       </main>

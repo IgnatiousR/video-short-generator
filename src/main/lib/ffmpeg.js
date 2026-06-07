@@ -192,7 +192,24 @@ function buildSilenceRemovalFilter(segments) {
   return parts.join(";");
 }
 
-async function trimClip(inputPath, outputPath, start, duration, headingOptions = null, aspectRatio = "1:1") {
+async function trimClip(inputPath, outputPath, start, duration, headingOptions = null, aspectRatio = "1:1", encoder = "libx264") {
+  const args = [
+    "-y",
+    "-hide_banner",
+    "-ss", start,
+    "-i", inputPath,
+    "-t", duration,
+  ];
+
+  if (aspectRatio === "Original" && (!headingOptions || !headingOptions.showHeading)) {
+    args.push("-map", "0:v:0");
+    args.push("-map", "0:a?");
+    args.push("-c", "copy");
+    args.push(outputPath);
+    await runProcess(ffmpegBin, args);
+    return;
+  }
+
   let w = 1080;
   let h = 1080;
   let dar = "1:1";
@@ -205,14 +222,6 @@ async function trimClip(inputPath, outputPath, start, duration, headingOptions =
     h = 1080;
     dar = "16:9";
   }
-
-  const args = [
-    "-y",
-    "-hide_banner",
-    "-ss", start,
-    "-i", inputPath,
-    "-t", duration,
-  ];
 
   let filterComplex = `[0:v]scale=${w}:${h}:force_original_aspect_ratio=decrease,pad=${w}:${h}:(ow-iw)/2:(oh-ih)/2,setsar=1:1,setdar=${dar},fps=30,format=yuv420p[bg]`;
 
@@ -232,7 +241,7 @@ async function trimClip(inputPath, outputPath, start, duration, headingOptions =
 
   args.push(
     "-c:v",
-    "libx264",
+    encoder,
     "-preset",
     "veryfast",
     "-crf",
@@ -252,7 +261,7 @@ async function trimClip(inputPath, outputPath, start, duration, headingOptions =
   await runProcess(ffmpegBin, args);
 }
 
-async function removeDeadSilence(inputClipPath, outputClipPath, silenceThreshold, silenceDuration, keepSilence) {
+async function removeDeadSilence(inputClipPath, outputClipPath, silenceThreshold, silenceDuration, keepSilence, encoder = "libx264") {
   const audioExists = await hasAudioStream(inputClipPath);
 
   if (!audioExists) {
@@ -299,7 +308,7 @@ async function removeDeadSilence(inputClipPath, outputClipPath, silenceThreshold
     "[outa]",
 
     "-c:v",
-    "libx264",
+    encoder,
     "-preset",
     "veryfast",
     "-crf",
@@ -319,7 +328,7 @@ async function removeDeadSilence(inputClipPath, outputClipPath, silenceThreshold
   await runProcess(ffmpegBin, args);
 }
 
-async function mergeOutro(clipPath, outroPath, outputPath, aspectRatio = "1:1") {
+async function mergeOutro(clipPath, outroPath, outputPath, aspectRatio = "1:1", encoder = "libx264") {
   const resolutionResult = await runProcess(
     ffprobeBin,
     [
@@ -370,7 +379,7 @@ async function mergeOutro(clipPath, outroPath, outputPath, aspectRatio = "1:1") 
     "-filter_complex", filterComplex,
     "-map", "[outv]",
     "-map", "[outa]",
-    "-c:v", "libx264",
+    "-c:v", encoder,
     "-preset", "veryfast",
     "-crf", "18",
     "-c:a", "aac",
