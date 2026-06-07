@@ -41,7 +41,7 @@ export default function DashboardTab({ batchStats, timePassed, clips, isProcessi
           <div className="col-span-1 text-right">ACTIONS</div>
         </div>
         
-        <div className="overflow-y-auto flex-1 p-2 space-y-1">
+        <div className="overflow-y-auto flex-1 p-2 space-y-1 scrollbar-thin scrollbar-thumb-border scrollbar-track-transparent hover:scrollbar-thumb-muted-foreground/50">
           {clips.map((clip: any) => (
             <div key={clip.id} className="grid grid-cols-12 gap-4 items-center p-3 rounded-lg hover:bg-muted/50 transition-colors group">
               <div className="col-span-5 text-sm font-medium truncate pr-4 text-foreground" title={clip.filename}>

@@ -59,7 +59,7 @@ export default function SettingsTab({
   }, [])
 
   return (
-    <div className="max-w-[800px] h-full animate-in fade-in duration-500 overflow-y-auto pr-4 pb-4">
+    <div className="max-w-[800px] h-full animate-in fade-in duration-500 overflow-y-auto pr-4 pb-4 scrollbar-thin scrollbar-thumb-border scrollbar-track-transparent hover:scrollbar-thumb-muted-foreground/50">
       <h2 className="text-2xl font-semibold text-foreground mb-2">
         Export Configuration
       </h2>

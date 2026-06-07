@@ -44,7 +44,7 @@ export default function EditorTab({
     <div className="flex gap-6 h-full animate-in fade-in duration-500">
       
       {/* LEFT COLUMN - FORMS */}
-      <div className="flex-1 flex flex-col gap-4 overflow-y-auto pr-2 pb-4">
+      <div className="flex-1 flex flex-col gap-4 overflow-y-auto pr-2 pb-4 scrollbar-thin scrollbar-thumb-border scrollbar-track-transparent hover:scrollbar-thumb-muted-foreground/50">
         
         <div className="bg-card border border-border rounded-xl p-6 shadow-sm flex flex-col gap-6">
           <div>

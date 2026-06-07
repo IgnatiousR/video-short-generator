@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { Button } from '@/components/ui/button'
+import { PlayCircle, Scissors, LayoutGrid, Settings, Sparkles } from 'lucide-react'
 
 import EditorTab from './components/EditorTab'
 import SettingsTab from './components/SettingsTab'
@@ -302,131 +303,139 @@ function App() {
   }
 
   return (
-    <div className="app-container">
-      <nav className="sidebar">
+    <div className="flex h-screen bg-background text-foreground dark overflow-hidden font-sans">
+      
+      {/* SIDEBAR */}
+      <nav className="w-64 border-r border-border bg-card flex flex-col justify-between shadow-sm z-10">
         <div>
-          <h1>ShortGen</h1>
-          <div className="sidebar-version">V 2.4.0</div>
+          <div className="p-6 pb-2">
+            <h1 className="text-2xl font-bold bg-gradient-to-r from-primary to-purple-400 bg-clip-text text-transparent">
+              ShortGen
+            </h1>
+            <div className="text-xs font-semibold text-muted-foreground tracking-widest mt-1">V 2.4.0</div>
+          </div>
 
-          <div
-            className={`nav-item ${activeTab === 'import' ? 'active' : ''}`}
-            onClick={() => setActiveTab('import')}
-          >
-            <span className="material-symbols-outlined" style={{ marginRight: 12 }}>
-              play_circle
-            </span>
-            Editor
-          </div>
-          <div className={`nav-item`} style={{ opacity: 0.5, cursor: 'not-allowed' }}>
-            <span className="material-symbols-outlined" style={{ marginRight: 12 }}>
-              content_cut
-            </span>
-            Trim Preview
-          </div>
-          <div
-            className={`nav-item ${activeTab === 'progress' ? 'active' : ''}`}
-            onClick={() => setActiveTab('progress')}
-          >
-            <span className="material-symbols-outlined" style={{ marginRight: 12 }}>
-              grid_view
-            </span>
-            Dashboard
-          </div>
-          <div
-            className={`nav-item ${activeTab === 'settings' ? 'active' : ''}`}
-            onClick={() => setActiveTab('settings')}
-          >
-            <span className="material-symbols-outlined" style={{ marginRight: 12 }}>
-              settings
-            </span>
-            Settings
+          <div className="mt-8 flex flex-col gap-1 px-3">
+            <button
+              onClick={() => setActiveTab('import')}
+              className={`flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-all
+                ${activeTab === 'import' ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-muted hover:text-foreground'}`}
+            >
+              <PlayCircle className="w-5 h-5" />
+              Editor
+            </button>
+            <button
+              disabled
+              className="flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium opacity-50 cursor-not-allowed text-muted-foreground"
+            >
+              <Scissors className="w-5 h-5" />
+              Trim Preview
+            </button>
+            <button
+              onClick={() => setActiveTab('progress')}
+              className={`flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-all
+                ${activeTab === 'progress' ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-muted hover:text-foreground'}`}
+            >
+              <LayoutGrid className="w-5 h-5" />
+              Dashboard
+            </button>
+            <button
+              onClick={() => setActiveTab('settings')}
+              className={`flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-all
+                ${activeTab === 'settings' ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-muted hover:text-foreground'}`}
+            >
+              <Settings className="w-5 h-5" />
+              Settings
+            </button>
           </div>
         </div>
       </nav>
 
-      <main className="main-content">
-        <header className="header">
-          <div className="header-left">WORKSPACE &gt; NEW PROJECT</div>
-          <div className="header-right">
-            <Button
-              variant="outline"
-              style={{
-                backgroundColor: 'transparent',
-                borderColor: 'var(--outline)',
-                color: '#fff'
-              }}
-            >
+      {/* MAIN CONTENT */}
+      <main className="flex-1 flex flex-col min-w-0 bg-background relative z-0">
+        
+        {/* HEADER */}
+        <header className="h-16 border-b border-border bg-card/50 backdrop-blur-sm flex items-center justify-between px-8 sticky top-0 z-10 shadow-sm">
+          <div className="text-xs font-bold text-muted-foreground tracking-widest uppercase">
+            Workspace <span className="mx-2 text-border">&gt;</span> <span className="text-foreground">New Project</span>
+          </div>
+          <div className="flex items-center gap-4">
+            <Button variant="outline" className="text-muted-foreground hover:text-foreground">
               Export
             </Button>
             <Button
               onClick={handleStart}
               disabled={isProcessing}
-              style={{ backgroundColor: '#a78bfa', color: '#121212', fontWeight: 600 }}
+              className="shadow-md shadow-primary/20 gap-2"
             >
+              <Sparkles className="w-4 h-4" />
               {isProcessing ? 'Processing...' : 'Process All'}
             </Button>
           </div>
         </header>
 
-        <div className="workspace">
-          {activeTab === 'import' && (
-            <EditorTab
-              validationError={validationError}
-              inputVideo={inputVideo}
-              setInputVideo={setInputVideo}
-              handleSelectFile={handleSelectFile}
-              handleDragOver={handleDragOver}
-              handleDrop={handleDrop}
-              inputMode={inputMode}
-              setInputMode={setInputMode}
-              csvPath={csvPath}
-              setCsvPath={setCsvPath}
-              manualClips={manualClips}
-              updateManualClip={updateManualClip}
-              removeManualClip={removeManualClip}
-              addManualClip={addManualClip}
-              outroVideo={outroVideo}
-              setOutroVideo={setOutroVideo}
-              outputDir={outputDir}
-              setOutputDir={setOutputDir}
-              handleSelectDir={handleSelectDir}
-              isProcessing={isProcessing}
-              handleStart={handleStart}
-            />
-          )}
+        {/* WORKSPACE AREA */}
+        <div className="flex-1 overflow-hidden p-8">
+          <div className="h-full w-full max-w-[1400px] mx-auto">
+            {activeTab === 'import' && (
+              <EditorTab
+                validationError={validationError}
+                inputVideo={inputVideo}
+                setInputVideo={setInputVideo}
+                handleSelectFile={handleSelectFile}
+                handleDragOver={handleDragOver}
+                handleDrop={handleDrop}
+                inputMode={inputMode}
+                setInputMode={setInputMode}
+                csvPath={csvPath}
+                setCsvPath={setCsvPath}
+                manualClips={manualClips}
+                updateManualClip={updateManualClip}
+                removeManualClip={removeManualClip}
+                addManualClip={addManualClip}
+                outroVideo={outroVideo}
+                setOutroVideo={setOutroVideo}
+                outputDir={outputDir}
+                setOutputDir={setOutputDir}
+                handleSelectDir={handleSelectDir}
+                isProcessing={isProcessing}
+                handleStart={handleStart}
+              />
+            )}
 
-          {activeTab === 'settings' && (
-            <SettingsTab
-              exportQuality={exportQuality}
-              setExportQuality={setExportQuality}
-              aspectRatio={aspectRatio}
-              setAspectRatio={setAspectRatio}
-              codecFormat={codecFormat}
-              setCodecFormat={setCodecFormat}
-              outputDir={outputDir}
-              handleSelectDir={handleSelectDir}
-              autoProcess={autoProcess}
-              setAutoProcess={setAutoProcess}
-              shouldRemoveSilence={shouldRemoveSilence}
-              setShouldRemoveSilence={setShouldRemoveSilence}
-              silencePreset={silencePreset}
-              handlePresetChange={handlePresetChange}
-              silenceThreshold={silenceThreshold}
-              setSilenceThreshold={setSilenceThreshold}
-              silenceDuration={silenceDuration}
-              setSilenceDuration={setSilenceDuration}
-            />
-          )}
+            {activeTab === 'settings' && (
+              <SettingsTab
+                exportQuality={exportQuality}
+                setExportQuality={setExportQuality}
+                aspectRatio={aspectRatio}
+                setAspectRatio={setAspectRatio}
+                codecFormat={codecFormat}
+                setCodecFormat={setCodecFormat}
+                outputDir={outputDir}
+                handleSelectDir={handleSelectDir}
+                autoProcess={autoProcess}
+                setAutoProcess={setAutoProcess}
+                shouldRemoveSilence={shouldRemoveSilence}
+                setShouldRemoveSilence={setShouldRemoveSilence}
+                silencePreset={silencePreset}
+                handlePresetChange={handlePresetChange}
+                silenceThreshold={silenceThreshold}
+                setSilenceThreshold={setSilenceThreshold}
+                silenceDuration={silenceDuration}
+                setSilenceDuration={setSilenceDuration}
+              />
+            )}
 
-          {activeTab === 'progress' && (
-            <DashboardTab
-              batchStats={batchStats}
-              timePassed={timePassed}
-              clips={clips}
-              isProcessing={isProcessing}
-              outputDir={outputDir}
-            />
-          )}
+            {activeTab === 'progress' && (
+              <DashboardTab
+                batchStats={batchStats}
+                timePassed={timePassed}
+                clips={clips}
+                isProcessing={isProcessing}
+                outputDir={outputDir}
+              />
+            )}
+          </div>
         </div>
       </main>
     </div>
