@@ -1,10 +1,14 @@
-const fs = require("fs");
-const { spawn } = require("child_process");
-const { getFontFileFilterOption } = require("./utils");
+import fs from "fs";
+import path from "path";
+import { spawn } from "child_process";
+import { getFontFileFilterOption } from "./utils";
 
-// Optional: set custom FFmpeg paths using environment variables.
-const ffmpegBin = process.env.FFMPEG_PATH || "ffmpeg";
-const ffprobeBin = process.env.FFPROBE_PATH || "ffprobe";
+import ffmpegStatic from "ffmpeg-static";
+import ffprobeStatic from "ffprobe-static";
+
+// Setup FFmpeg static paths, replacing app.asar for unpacked binaries in production
+const ffmpegBin = process.env.FFMPEG_PATH || ffmpegStatic.replace('app.asar', 'app.asar.unpacked');
+const ffprobeBin = process.env.FFPROBE_PATH || ffprobeStatic.path.replace('app.asar', 'app.asar.unpacked');
 
 function runProcess(command, args, options = {}) {
   const capture = Boolean(options.capture);
@@ -188,32 +192,43 @@ function buildSilenceRemovalFilter(segments) {
   return parts.join(";");
 }
 
-async function trimClip(inputPath, outputPath, start, duration, headingOptions = null) {
+async function trimClip(inputPath, outputPath, start, duration, headingOptions = null, aspectRatio = "1:1") {
+  let w = 1080;
+  let h = 1080;
+  let dar = "1:1";
+  if (aspectRatio === "9:16") {
+    w = 1080;
+    h = 1920;
+    dar = "9:16";
+  } else if (aspectRatio === "16:9") {
+    w = 1920;
+    h = 1080;
+    dar = "16:9";
+  }
+
   const args = [
     "-y",
     "-hide_banner",
-
-    "-ss",
-    start,
-
-    "-i",
-    inputPath,
-
-    "-t",
-    duration,
-
-    "-map",
-    "0:v:0",
-    "-map",
-    "0:a?",
+    "-ss", start,
+    "-i", inputPath,
+    "-t", duration,
   ];
 
+  let filterComplex = `[0:v]scale=${w}:${h}:force_original_aspect_ratio=decrease,pad=${w}:${h}:(ow-iw)/2:(oh-ih)/2,setsar=1:1,setdar=${dar},fps=30,format=yuv420p[bg]`;
+
   if (headingOptions && headingOptions.showHeading) {
-    const { titleFile } = headingOptions;
-    const safeTitleFile = titleFile.replace(/\\/g, "/");
-    const fontStr = getFontFileFilterOption();
-    args.push("-vf", `drawtext=${fontStr}textfile='${safeTitleFile}':fontcolor=#FFD700:fontsize=48:x=(w-text_w)/2:y=50:box=1:boxcolor=black@0.6:boxborderw=10`);
+    const { titleFile, headingFont } = headingOptions;
+    const relativeTitleFile = path.relative(process.cwd(), titleFile).replace(/\\/g, "/");
+    const fontStr = getFontFileFilterOption(headingFont);
+    filterComplex += `;[bg]drawtext=${fontStr}textfile='${relativeTitleFile}':fontcolor=#FFD700:fontsize=48:x=(w-text_w)/2:y=50:box=1:boxcolor=black@0.6:boxborderw=10:line_spacing=10[outv]`;
+    args.push("-filter_complex", filterComplex);
+    args.push("-map", "[outv]");
+  } else {
+    args.push("-filter_complex", filterComplex);
+    args.push("-map", "[bg]");
   }
+
+  args.push("-map", "0:a?");
 
   args.push(
     "-c:v",
@@ -304,13 +319,13 @@ async function removeDeadSilence(inputClipPath, outputClipPath, silenceThreshold
   await runProcess(ffmpegBin, args);
 }
 
-async function mergeOutro(clipPath, outroPath, outputPath) {
+async function mergeOutro(clipPath, outroPath, outputPath, aspectRatio = "1:1") {
   const resolutionResult = await runProcess(
     ffprobeBin,
     [
       "-v", "error",
       "-select_streams", "v:0",
-      "-show_entries", "stream=width,height,sample_aspect_ratio,display_aspect_ratio",
+      "-show_entries", "stream=width,height,sample_aspect_ratio,display_aspect_ratio,r_frame_rate",
       "-of", "json",
       clipPath
     ],
@@ -327,17 +342,25 @@ async function mergeOutro(clipPath, outroPath, outputPath) {
     // ignore
   }
 
-  const w = videoInfo.width || 1920;
-  const h = videoInfo.height || 1080;
-  let sar = videoInfo.sample_aspect_ratio || "1:1";
-  if (sar === "0:1") sar = "1:1";
-  let dar = videoInfo.display_aspect_ratio || "16:9";
-  if (dar === "0:1") dar = "16:9";
+  let w = 1080;
+  let h = 1080;
+  let dar = "1:1";
+  if (aspectRatio === "9:16") {
+    w = 1080;
+    h = 1920;
+    dar = "9:16";
+  } else if (aspectRatio === "16:9") {
+    w = 1920;
+    h = 1080;
+    dar = "16:9";
+  }
+  let fps = videoInfo.r_frame_rate || "30";
 
-  const filterComplex = `[1:v]scale=${w}:${h}:force_original_aspect_ratio=decrease,pad=${w}:${h}:(ow-iw)/2:(oh-ih)/2,setsar=${sar},setdar=${dar}[v1];` + 
+  const filterComplex = `[1:v]scale=${w}:${h}:force_original_aspect_ratio=decrease,pad=${w}:${h}:(ow-iw)/2:(oh-ih)/2,setsar=1:1,setdar=${dar},fps=${fps},format=yuv420p[v1];` + 
+                        `[0:v]scale=${w}:${h}:force_original_aspect_ratio=decrease,pad=${w}:${h}:(ow-iw)/2:(oh-ih)/2,setsar=1:1,setdar=${dar},fps=${fps},format=yuv420p[v0];` +
                         `[1:a]aresample=44100[a1];` +
                         `[0:a]aresample=44100[a0];` +
-                        `[0:v][a0][v1][a1]concat=n=2:v=1:a=1[outv][outa]`;
+                        `[v0][a0][v1][a1]concat=n=2:v=1:a=1[outv][outa]`;
 
   const args = [
     "-y",
@@ -359,7 +382,7 @@ async function mergeOutro(clipPath, outroPath, outputPath) {
   await runProcess(ffmpegBin, args);
 }
 
-module.exports = {
+export {
   trimClip,
   removeDeadSilence,
   mergeOutro,

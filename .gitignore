@@ -137,3 +137,6 @@ dist
 
 # Video files
 *.mp4
+
+# Generated video clips
+clips/

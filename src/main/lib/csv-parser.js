@@ -56,7 +56,7 @@ function csvToObjects(csvText) {
   });
 }
 
-module.exports = {
+export {
   parseCsv,
   csvToObjects,
 };

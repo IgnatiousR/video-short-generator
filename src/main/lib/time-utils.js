@@ -54,7 +54,7 @@ function parseTimeRange(range) {
   };
 }
 
-module.exports = {
+export {
   timeToSeconds,
   secondsToFfmpegTime,
   parseTimeRange,

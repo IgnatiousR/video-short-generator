@@ -1,10 +1,35 @@
-# Video Clipper from CSV
+# Video Clipper from CSV (Electron App)
 
-This Node.js script takes one full MP4 video and a CSV file, then creates separate video clips based on the time ranges listed in the CSV.
-
+A desktop application that takes one full MP4 video and a CSV file, then creates separate video clips based on the time ranges listed in the CSV.
 It can also optionally remove dead silence from each generated clip using FFmpeg.
 
 ---
+
+## Application Usage
+
+### Development
+
+First, install dependencies:
+```bash
+npm install
+```
+
+Start the development server:
+```bash
+npm run dev
+```
+
+### Building the App
+
+To build the application for your operating system:
+- **Windows**: `npm run build:win`
+- **macOS**: `npm run build:mac`
+- **Linux**: `npm run build:linux`
+
+---
+
+## CLI Usage (Advanced/Legacy)
+
 
 ## Features
 
