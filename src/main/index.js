@@ -60,7 +60,7 @@ app.whenReady().then(() => {
     return null
   })
 
-  ipcMain.handle('dialog:openDirectory', async (event) => {
+  ipcMain.handle('dialog:openDirectory', async () => {
     const { canceled, filePaths } = await dialog.showOpenDialog(mainWindow, {
       properties: ['openDirectory']
     })

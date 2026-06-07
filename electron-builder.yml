@@ -1,5 +1,5 @@
 appId: com.electron.app
-productName: tmp_electron
+productName: ShortGen
 compression: maximum
 directories:
   buildResources: build
@@ -16,7 +16,7 @@ files:
 asarUnpack:
   - resources/**
 win:
-  executableName: tmp_electron
+  executableName: ShortGen
 nsis:
   artifactName: ${name}-${version}-setup.${ext}
   shortcutName: ${productName}

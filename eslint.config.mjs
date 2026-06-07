@@ -24,7 +24,10 @@ export default [
     },
     rules: {
       ...eslintPluginReactHooks.configs.recommended.rules,
-      ...eslintPluginReactRefresh.configs.vite.rules
+      ...eslintPluginReactRefresh.configs.vite.rules,
+      'react/prop-types': 'off',
+      'no-unused-vars': ['error', { varsIgnorePattern: '^(React|Label)$' }],
+      'react-refresh/only-export-components': 'off'
     }
   },
   eslintConfigPrettier

@@ -1,28 +1,28 @@
-import React, { useMemo, useRef } from "react";
-import { Label } from "@/components/ui/label";
-import { TimePickerInput } from "./time-picker-input";
+import React, { useMemo, useRef } from 'react'
+import { Label } from '@/components/ui/label'
+import { TimePickerInput } from './time-picker-input'
 
 export function TimeInput({ value, onChange }) {
-  const minuteRef = useRef(null);
-  const hourRef = useRef(null);
-  const secondRef = useRef(null);
+  const minuteRef = useRef(null)
+  const hourRef = useRef(null)
+  const secondRef = useRef(null)
 
   const date = useMemo(() => {
-    const d = new Date();
-    const parts = (value || "00:00:00").split(":");
-    d.setHours(parseInt(parts[0] || "0", 10));
-    d.setMinutes(parseInt(parts[1] || "0", 10));
-    d.setSeconds(parseInt(parts[2] || "0", 10));
-    return d;
-  }, [value]);
+    const d = new Date()
+    const parts = (value || '00:00:00').split(':')
+    d.setHours(parseInt(parts[0] || '0', 10))
+    d.setMinutes(parseInt(parts[1] || '0', 10))
+    d.setSeconds(parseInt(parts[2] || '0', 10))
+    return d
+  }, [value])
 
   const setDate = (newDate) => {
-    if (!newDate) return;
-    const h = newDate.getHours().toString().padStart(2, "0");
-    const m = newDate.getMinutes().toString().padStart(2, "0");
-    const s = newDate.getSeconds().toString().padStart(2, "0");
-    onChange(`${h}:${m}:${s}`);
-  };
+    if (!newDate) return
+    const h = newDate.getHours().toString().padStart(2, '0')
+    const m = newDate.getMinutes().toString().padStart(2, '0')
+    const s = newDate.getSeconds().toString().padStart(2, '0')
+    onChange(`${h}:${m}:${s}`)
+  }
 
   return (
     <div className="flex items-center gap-1">
@@ -57,5 +57,5 @@ export function TimeInput({ value, onChange }) {
         />
       </div>
     </div>
-  );
+  )
 }
